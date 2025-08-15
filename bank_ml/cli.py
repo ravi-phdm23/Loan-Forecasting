@@ -69,7 +69,7 @@ def fit(config: Path = typer.Option(..., "--config", "-c", exists=True)) -> None
     X_train_sel = X_train_pre[:, mask]
     _save_json(
         {"mask": mask.astype(int).tolist(), "selected_names": ga_res["selected_names"]},
-        out_dir / "ga_result.json",
+        out_dir / "ga_selection.json",
     )
 
     # ------------------------------------------------------------------
@@ -77,7 +77,7 @@ def fit(config: Path = typer.Option(..., "--config", "-c", exists=True)) -> None
     # ------------------------------------------------------------------
     cluster_res = clustering.select_k_and_cluster(X_train_sel, cfg.clustering.k_grid, cfg)
     labels = cluster_res["labels"]
-    joblib.dump(cluster_res["model"], out_dir / "cluster_model.joblib")
+    joblib.dump(cluster_res["model"], out_dir / "clustering.joblib")
     _save_json(
         {
             "k": int(cluster_res["k"]),
@@ -85,7 +85,7 @@ def fit(config: Path = typer.Option(..., "--config", "-c", exists=True)) -> None
             "sil_per_k": cluster_res["sil_per_k"],
             "centers": cluster_res["centers"].tolist(),
         },
-        out_dir / "cluster_result.json",
+        out_dir / "clustering.json",
     )
 
     # ------------------------------------------------------------------
@@ -107,6 +107,9 @@ def fit(config: Path = typer.Option(..., "--config", "-c", exists=True)) -> None
     model_dict.update(model_res["baselines"])
     evaluate.evaluate_models(model_dict, X_test_aug, y_test.to_numpy(), cfg)
 
+    # Generate markdown report summarising the run
+    _generate_report(cfg)
+
     logger.info("Training pipeline complete. Artefacts saved to %s", out_dir)
 
 
@@ -122,11 +125,11 @@ def predict(
     out_dir = Path(cfg.paths.output_dir)
 
     preproc = preprocess.load_preprocess(out_dir / "preprocess.joblib")
-    ga_info = _load_json(out_dir / "ga_result.json")
+    ga_info = _load_json(out_dir / "ga_selection.json")
     mask = np.array(ga_info["mask"], dtype=bool)
-    cluster_model = joblib.load(out_dir / "cluster_model.joblib")
+    cluster_model = joblib.load(out_dir / "clustering.joblib")
 
-    model = joblib.load(out_dir / "mlp_model.joblib")
+    model = joblib.load(out_dir / "mlp.joblib")
 
     df = pd.read_csv(input)
     X = df.drop(columns=[cfg.label], errors="ignore")
@@ -148,15 +151,29 @@ def report(config: Path = typer.Option(..., "--config", "-c", exists=True)) -> N
     """Generate a concise markdown report of the training run."""
 
     cfg = load_config(config)
+    _generate_report(cfg)
+
+
+def _generate_report(cfg: Config) -> None:
+    """Internal helper to create a markdown report for a run."""
+
     out_dir = ensure_output_dirs(cfg)
 
-    ga_info = _load_json(out_dir / "ga_result.json") if (out_dir / "ga_result.json").exists() else {}
-    cluster_info = (
-        _load_json(out_dir / "cluster_result.json")
-        if (out_dir / "cluster_result.json").exists()
+    ga_info = (
+        _load_json(out_dir / "ga_selection.json")
+        if (out_dir / "ga_selection.json").exists()
         else {}
     )
-    manifest = _load_json(out_dir / "manifest.json") if (out_dir / "manifest.json").exists() else {}
+    cluster_info = (
+        _load_json(out_dir / "clustering.json")
+        if (out_dir / "clustering.json").exists()
+        else {}
+    )
+    manifest = (
+        _load_json(out_dir / "manifest.json")
+        if (out_dir / "manifest.json").exists()
+        else {}
+    )
 
     metrics_df = pd.DataFrame()
     metrics_path = out_dir / "metrics.csv"
@@ -183,7 +200,10 @@ def report(config: Path = typer.Option(..., "--config", "-c", exists=True)) -> N
 
         if not metrics_df.empty:
             fh.write("## Test Metrics\n")
-            fh.write(metrics_df.to_markdown() + "\n")
+            try:  # pandas.to_markdown requires optional tabulate dependency
+                fh.write(metrics_df.to_markdown() + "\n")
+            except Exception:  # pragma: no cover - fallback when tabulate missing
+                fh.write(metrics_df.to_string() + "\n")
 
     logger.info("Report generated at %s", md_path)
 
