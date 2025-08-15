@@ -9,7 +9,12 @@ import json
 
 import numpy as np
 import pandas as pd
-from matplotlib import pyplot as plt
+from loguru import logger
+
+try:  # pragma: no cover - matplotlib optional
+    from matplotlib import pyplot as plt  # type: ignore
+except Exception:  # pragma: no cover
+    plt = None
 from sklearn.metrics import (
     accuracy_score,
     confusion_matrix,
@@ -29,6 +34,8 @@ from .config import Config
 def _save_confusion_matrix(cm: np.ndarray, name: str) -> None:
     """Save a confusion matrix plot under the ``assets`` directory."""
 
+    if plt is None:  # pragma: no cover - plotting optional
+        return
     assets = Path("assets")
     assets.mkdir(exist_ok=True)
     try:  # pragma: no cover - plotting not essential for tests
@@ -38,8 +45,8 @@ def _save_confusion_matrix(cm: np.ndarray, name: str) -> None:
         plt.tight_layout()
         plt.savefig(assets / f"{name}_confusion_matrix.png")
         plt.close()
-    except Exception:  # pragma: no cover - ignore plotting errors
-        pass
+    except Exception as exc:  # pragma: no cover - ignore plotting errors
+        logger.warning("Failed to plot confusion matrix for %s: %s", name, exc)
 
 
 def _save_curves(y_test: np.ndarray, y_proba: np.ndarray, name: str) -> None:
@@ -48,6 +55,8 @@ def _save_curves(y_test: np.ndarray, y_proba: np.ndarray, name: str) -> None:
     if y_proba.shape[1] != 2:
         return
 
+    if plt is None:  # pragma: no cover - plotting optional
+        return
     assets = Path("assets")
     assets.mkdir(exist_ok=True)
 
@@ -72,8 +81,8 @@ def _save_curves(y_test: np.ndarray, y_proba: np.ndarray, name: str) -> None:
         plt.tight_layout()
         plt.savefig(assets / f"{name}_pr_curve.png")
         plt.close()
-    except Exception:  # pragma: no cover - ignore plotting issues
-        pass
+    except Exception as exc:  # pragma: no cover - ignore plotting issues
+        logger.warning("Failed to plot ROC/PR curves for %s: %s", name, exc)
 
 
 def evaluate_models(

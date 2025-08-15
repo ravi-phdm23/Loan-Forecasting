@@ -11,7 +11,12 @@ from pathlib import Path
 from typing import Dict
 
 import numpy as np
-import matplotlib.pyplot as plt
+from loguru import logger
+
+try:  # pragma: no cover - matplotlib optional
+    import matplotlib.pyplot as plt  # type: ignore
+except Exception:  # pragma: no cover
+    plt = None
 from sklearn.cluster import KMeans
 from sklearn.metrics import davies_bouldin_score, silhouette_score
 
@@ -21,16 +26,21 @@ from .config import Config
 def _plot_metric(k_vals: list[int], metric: Dict[int, float], ylabel: str, filename: str) -> None:
     """Plot a metric versus ``k`` and save under the assets directory."""
 
+    if plt is None:  # pragma: no cover - plotting optional
+        return
     asset_dir = Path("assets")
     asset_dir.mkdir(exist_ok=True)
-    plt.figure()
-    plt.plot(k_vals, [metric[k] for k in k_vals], marker="o")
-    plt.xlabel("k")
-    plt.ylabel(ylabel)
-    plt.xticks(k_vals)
-    plt.tight_layout()
-    plt.savefig(asset_dir / filename)
-    plt.close()
+    try:
+        plt.figure()
+        plt.plot(k_vals, [metric[k] for k in k_vals], marker="o")
+        plt.xlabel("k")
+        plt.ylabel(ylabel)
+        plt.xticks(k_vals)
+        plt.tight_layout()
+        plt.savefig(asset_dir / filename)
+        plt.close()
+    except Exception as exc:  # pragma: no cover
+        logger.warning("Failed to plot %s: %s", filename, exc)
 
 
 def select_k_and_cluster(

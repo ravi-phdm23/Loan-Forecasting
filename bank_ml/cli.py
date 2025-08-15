@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import json
+import random
 
 import joblib
 import numpy as np
@@ -39,11 +40,22 @@ def _load_json(path: Path) -> dict:
 
 
 @app.command()
-def fit(config: Path = typer.Option(..., "--config", "-c", exists=True)) -> None:
+def fit(
+    config: Path = typer.Option(..., "--config", "-c", exists=True),
+    fast: bool = typer.Option(False, "--fast", help="Halve GA generations and PSO iterations"),
+) -> None:
     """Run the full training pipeline and persist all artefacts."""
 
     cfg = load_config(config)
+    if fast:
+        cfg.ga.gens = max(1, cfg.ga.gens // 2)
+        cfg.pso.iters = max(1, cfg.pso.iters // 2)
+
+    random.seed(cfg.cv.random_state)
+    np.random.seed(cfg.cv.random_state)
+
     out_dir = ensure_output_dirs(cfg)
+    cfg.paths.output_dir = out_dir
 
     # ------------------------------------------------------------------
     # Load data and split

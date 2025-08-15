@@ -24,6 +24,7 @@ After installation, the `bank-ml` command becomes available.
 
 ```bash
 bank-ml fit --config config.yaml
+bank-ml fit --config config.yaml --fast  # quick smoke test
 bank-ml predict --config config.yaml --input new.csv --output preds.csv
 bank-ml report --config config.yaml
 ```
@@ -74,5 +75,6 @@ the full pipeline using the provided `demo-config.yaml` via:
 make demo
 ```
 
-The outputs (models, metrics, report and plots) will be written to
-`outputs/run1` and `assets`.
+Each training run stores artefacts under a timestamped subdirectory inside
+`output_dir`, e.g. `outputs/run1/20240101-120000`. Plots are written to the
+shared `assets` folder.

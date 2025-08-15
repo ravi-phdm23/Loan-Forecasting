@@ -2,6 +2,7 @@
 from __future__ import annotations
 from pathlib import Path
 from typing import List, Optional
+from datetime import datetime
 
 import yaml
 from pydantic import BaseModel, Field
@@ -76,10 +77,15 @@ def load_config(path: Path | str) -> Config:
 
 
 def ensure_output_dirs(config: Config) -> Path:
-    """Ensure that the output directory exists.
+    """Create and return a timestamped output directory.
 
-    Returns the path to the output directory.
+    All artefacts for a particular run are stored in a uniquely timestamped
+    subdirectory within ``config.paths.output_dir``. The returned path points to
+    this new subdirectory.
     """
-    out_path = config.paths.output_dir
+    root = config.paths.output_dir
+    root.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+    out_path = root / ts
     out_path.mkdir(parents=True, exist_ok=True)
     return out_path
