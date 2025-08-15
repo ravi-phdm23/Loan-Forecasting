@@ -1,0 +1,33 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "bank-ml"
+version = "0.1.0"
+description = "Bank marketing machine-learning pipeline"
+readme = "README.md"
+authors = [{name = "Bank ML", email = "dev@example.com"}]
+requires-python = ">=3.10"
+dependencies = [
+    "pandas",
+    "numpy",
+    "scikit-learn",
+    "imbalanced-learn",
+    "joblib",
+    "pydantic",
+    "typer",
+    "loguru",
+    "matplotlib",
+    "deap",
+    "pyswarms",
+    "PyYAML",
+]
+
+[project.scripts]
+bank-ml = "bank_ml.cli:app"
+
+[tool.hatch.envs.default]
+dependencies = ["pytest"]
+[tool.hatch.envs.default.scripts]
+test = "pytest"
