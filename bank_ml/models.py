@@ -151,7 +151,8 @@ def train_models(
     # Persist models -----------------------------------------------------
     out_dir = Path(cfg.paths.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    joblib.dump(mlp, out_dir / "mlp_model.joblib")
+    # Persist tuned MLP under a simple and predictable name
+    joblib.dump(mlp, out_dir / "mlp.joblib")
     for name, model in baselines.items():
         joblib.dump(model, out_dir / f"{name}.joblib")
 

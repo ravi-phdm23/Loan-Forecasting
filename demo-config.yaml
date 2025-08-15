@@ -1,0 +1,30 @@
+paths:
+  input_csv: banking_dataset.csv
+  output_dir: outputs/run1
+label: Label_LoanDefault
+id_column: CustomerID
+cv:
+  n_splits: 5
+  test_size: 0.3
+  random_state: 42
+imbalance:
+  method: class_weight
+ga:
+  pop: 20
+  gens: 15
+  cx_prob: 0.8
+  mut_prob: 0.1
+clustering:
+  k_grid: [2,3,4,5,6]
+  n_init: 15
+  max_iter: 300
+pso:
+  particles: 16
+  iters: 20
+mlp_bounds:
+  hidden1: [16, 64]
+  hidden2: [16, 64]
+  lr: [0.0001, 0.05]
+  alpha: [1e-6, 1e-3]
+  momentum: [0.5, 0.95]
+  activation_choices: ["logistic","tanh","relu"]

@@ -64,6 +64,14 @@ def load_config(path: Path | str) -> Config:
     path = Path(path)
     with path.open("r") as fh:
         data = yaml.safe_load(fh) or {}
+
+    # Allow ``imbalance`` to be specified either as a plain string or as a
+    # mapping with a ``method`` field.  The README examples use the latter form
+    # for readability, so we normalise it here for the ``Config`` model.
+    imb = data.get("imbalance")
+    if isinstance(imb, dict) and "method" in imb:
+        data["imbalance"] = imb["method"]
+
     return Config.model_validate(data)
 
 
