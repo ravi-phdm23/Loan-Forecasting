@@ -105,6 +105,7 @@ def select_k_and_cluster(
         "dbi_per_k": dbi_per_k,
         "sil_per_k": sil_per_k,
         "centers": model.cluster_centers_,
+        "model": model,
     }
 
 
