@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import List, Dict
 
 import numpy as np
+from loguru import logger
 
 from bank_ml.config import Config
 
@@ -13,6 +14,7 @@ try:  # pragma: no cover - optional dependency
     from deap import base, creator, tools  # type: ignore
 except Exception:  # pragma: no cover
     base = creator = tools = None
+    logger.warning("deap not available; using NumPy GA fallback")
 
 try:  # pragma: no cover - optional dependency
     import matplotlib.pyplot as plt  # type: ignore
@@ -23,11 +25,11 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import cross_val_score
 
 
-def _ensure_min_features(mask: np.ndarray, min_selected: int) -> None:
+def _ensure_min_features(mask: np.ndarray, min_selected: int, rng: np.random.Generator) -> None:
     """Ensure that a boolean mask selects at least ``min_selected`` features."""
 
     if mask.sum() < min_selected:
-        idx = np.random.choice(mask.size, min_selected, replace=False)
+        idx = rng.choice(mask.size, min_selected, replace=False)
         mask[idx] = True
 
 
@@ -36,15 +38,18 @@ def _plot_history(history: List[float], out_file: Path) -> None:
 
     if plt is None:  # pragma: no cover - plotting is optional
         return
-    out_file.parent.mkdir(parents=True, exist_ok=True)
-    plt.figure()
-    plt.plot(range(1, len(history) + 1), history)
-    plt.xlabel("Generation")
-    plt.ylabel("Best F1-weighted")
-    plt.title("GA Feature Selection")
-    plt.tight_layout()
-    plt.savefig(out_file)
-    plt.close()
+    try:
+        out_file.parent.mkdir(parents=True, exist_ok=True)
+        plt.figure()
+        plt.plot(range(1, len(history) + 1), history)
+        plt.xlabel("Generation")
+        plt.ylabel("Best F1-weighted")
+        plt.title("GA Feature Selection")
+        plt.tight_layout()
+        plt.savefig(out_file)
+        plt.close()
+    except Exception as exc:  # pragma: no cover - ignore plotting errors
+        logger.warning("Failed to plot GA history: %s", exc)
 
 
 def _eval_mask(
@@ -74,8 +79,7 @@ def _numpy_ga(
     class_weight,
 ) -> tuple[np.ndarray, List[float], float]:
     """Simple GA using NumPy operations."""
-
-    rng = np.random.default_rng()
+    rng = np.random.default_rng(cfg.cv.random_state)
     n_features = X_np.shape[1]
     pop_size = cfg.ga.pop
     gens = cfg.ga.gens
@@ -87,7 +91,7 @@ def _numpy_ga(
 
     def init_individual() -> np.ndarray:
         mask = rng.random(n_features) < 0.5
-        _ensure_min_features(mask, min_selected)
+        _ensure_min_features(mask, min_selected, rng)
         return mask
 
     population = np.array([init_individual() for _ in range(pop_size)], dtype=bool)
@@ -121,7 +125,7 @@ def _numpy_ga(
             if rng.random() < mut_prob:
                 flips = rng.random(n_features) < (1.0 / n_features)
                 population[i] = np.logical_xor(population[i], flips)
-            _ensure_min_features(population[i], min_selected)
+            _ensure_min_features(population[i], min_selected, rng)
 
         scores = np.array([fitness(ind) for ind in population])
         gen_best_idx = int(np.argmax(scores))
@@ -155,13 +159,16 @@ def ga_select_features(
         Configuration containing GA parameters.
     """
 
+    np.random.seed(cfg.cv.random_state)
     n_features = X_np.shape[1]
     min_selected = 5 if n_features >= 10 else 1
     class_weight = "balanced" if cfg.imbalance != "none" else None
+    rng_np = np.random.default_rng(cfg.cv.random_state)
 
     if tools is not None:  # pragma: no cover - exercised if deap is installed
         import random
 
+        random.seed(cfg.cv.random_state)
         creator.create("FitnessMax", base.Fitness, weights=(1.0,))
         creator.create("Individual", list, fitness=creator.FitnessMax)
 
@@ -185,7 +192,7 @@ def ga_select_features(
         population = toolbox.population(n=cfg.ga.pop)
         for ind in population:
             mask = np.array(ind, dtype=bool)
-            _ensure_min_features(mask, min_selected)
+            _ensure_min_features(mask, min_selected, rng_np)
             for i, val in enumerate(mask):
                 ind[i] = int(val)
 
@@ -213,7 +220,7 @@ def ga_select_features(
                     toolbox.mutate(mutant)
                     del mutant.fitness.values
                 mask = np.array(mutant, dtype=bool)
-                _ensure_min_features(mask, min_selected)
+                _ensure_min_features(mask, min_selected, rng_np)
                 for i, val in enumerate(mask):
                     mutant[i] = int(val)
 

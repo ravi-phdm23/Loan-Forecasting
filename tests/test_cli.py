@@ -48,5 +48,7 @@ def test_cli_fit_generates_metrics(tmp_path: Path):
     runner = CliRunner()
     result = runner.invoke(app, ["fit", "--config", str(cfg_path)])
     assert result.exit_code == 0
-    metrics_path = tmp_path / "out" / "metrics.csv"
+    out_subdirs = list((tmp_path / "out").glob("*"))
+    assert out_subdirs, "no output directory created"
+    metrics_path = out_subdirs[0] / "metrics.csv"
     assert metrics_path.exists()

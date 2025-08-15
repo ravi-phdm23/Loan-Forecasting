@@ -16,8 +16,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Dict, List, Tuple
 
-import matplotlib.pyplot as plt
+from loguru import logger
 import numpy as np
+
+try:  # pragma: no cover - optional dependency
+    import matplotlib.pyplot as plt  # type: ignore
+except Exception:  # pragma: no cover - matplotlib is optional
+    plt = None
 from sklearn.metrics import f1_score
 from sklearn.model_selection import check_cv
 from sklearn.neural_network import MLPClassifier
@@ -27,6 +32,7 @@ try:  # pragma: no cover - optional dependency
     import pyswarms as ps  # type: ignore
 except Exception:  # pragma: no cover - pyswarms is optional
     ps = None
+    logger.warning("pyswarms not available; using NumPy PSO fallback")
 
 from imblearn.over_sampling import SMOTE
 
@@ -124,6 +130,7 @@ def _basic_pso(
     high: np.ndarray,
     particles: int,
     iters: int,
+    random_state: int,
 ) -> Tuple[np.ndarray, List[float]]:
     """A very small PSO implementation with dynamic coefficients.
 
@@ -132,7 +139,8 @@ def _basic_pso(
     """
 
     dim = len(low)
-    pos = low + np.random.rand(particles, dim) * (high - low)
+    rng = np.random.default_rng(random_state)
+    pos = low + rng.random((particles, dim)) * (high - low)
     vel = np.zeros((particles, dim))
 
     pbest = pos.copy()
@@ -150,8 +158,8 @@ def _basic_pso(
         c1 = 2.0 - frac
         c2 = 2.0 + frac
 
-        r1 = np.random.rand(particles, dim)
-        r2 = np.random.rand(particles, dim)
+        r1 = rng.random((particles, dim))
+        r2 = rng.random((particles, dim))
         vel = w * vel + c1 * r1 * (pbest - pos) + c2 * r2 * (gbest - pos)
         pos = np.clip(pos + vel, low, high)
 
@@ -196,6 +204,7 @@ def pso_tune_mlp(
         ``{"params": best_params, "best_cv_f1_weighted": score, "trajectory": history}``
     """
 
+    np.random.seed(cfg.cv.random_state)
     bounds = cfg.mlp_bounds
     activation_choices = list(bounds.activation_choices)
 
@@ -241,7 +250,9 @@ def pso_tune_mlp(
         best_cost, best_pos = optimizer.optimize(batch_cost, iters)
         trajectory = [-c for c in optimizer.cost_history]
     else:
-        best_pos, trajectory = _basic_pso(cost_single, low, high, particles, iters)
+        best_pos, trajectory = _basic_pso(
+            cost_single, low, high, particles, iters, cfg.cv.random_state
+        )
         best_cost = -max(trajectory)
 
     best_params = _decode_particle(best_pos, activation_choices)
@@ -250,17 +261,21 @@ def pso_tune_mlp(
     # ------------------------------------------------------------------
     # Save convergence plot
     # ------------------------------------------------------------------
-    assets_dir = Path(__file__).resolve().parent.parent / "assets"
-    assets_dir.mkdir(parents=True, exist_ok=True)
-    plot_path = assets_dir / "pso_convergence.png"
-    plt.figure()
-    plt.plot(range(1, len(trajectory) + 1), trajectory)
-    plt.xlabel("Iteration")
-    plt.ylabel("Best F1-weighted")
-    plt.title("PSO convergence")
-    plt.tight_layout()
-    plt.savefig(plot_path)
-    plt.close()
+    if plt is not None:  # pragma: no cover - plotting optional
+        try:
+            assets_dir = Path(__file__).resolve().parent.parent / "assets"
+            assets_dir.mkdir(parents=True, exist_ok=True)
+            plot_path = assets_dir / "pso_convergence.png"
+            plt.figure()
+            plt.plot(range(1, len(trajectory) + 1), trajectory)
+            plt.xlabel("Iteration")
+            plt.ylabel("Best F1-weighted")
+            plt.title("PSO convergence")
+            plt.tight_layout()
+            plt.savefig(plot_path)
+            plt.close()
+        except Exception as exc:
+            logger.warning("Failed to plot PSO convergence: %s", exc)
 
     return {
         "params": best_params,
