@@ -75,9 +75,33 @@ the full pipeline using the provided `demo-config.yaml` via:
 make demo
 ```
 
+### Smoke check
+
+A lightweight verification script is provided to ensure the pipeline and its
+dependencies work end‑to‑end:
+
+```bash
+python scripts/smoke_check.py
+```
+
+The script trains in fast mode on a small sample of the demo dataset, checks
+that expected artefacts are produced and runs a short prediction.
+
 Each training run stores artefacts under a timestamped subdirectory inside
 `output_dir`, e.g. `outputs/run1/20240101-120000`. Plots are written to the
 shared `assets` folder.
+
+Expected files inside the run directory include:
+
+- `preprocess.joblib` – fitted preprocessing pipeline
+- `feature_names.json` – names of engineered features
+- `ga_selection.json` – feature selection mask and chosen names
+- `clustering.joblib` and `clustering.json` – clustering model and metrics
+- `mlp.joblib`, `log_reg.joblib`, `decision_tree.joblib`, `random_forest.joblib`
+  – trained models
+- `manifest.json` – summary of training parameters and scores
+- `metrics.csv` – evaluation metrics for the models
+- `report.md` – Markdown report of the run
 
 ## Streamlit App
 
