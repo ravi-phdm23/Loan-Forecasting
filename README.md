@@ -78,3 +78,19 @@ make demo
 Each training run stores artefacts under a timestamped subdirectory inside
 `output_dir`, e.g. `outputs/run1/20240101-120000`. Plots are written to the
 shared `assets` folder.
+
+## Streamlit App
+
+An optional Streamlit UI is provided for interacting with the pipeline. Launch
+it with:
+
+```bash
+streamlit run app_streamlit.py
+```
+
+The sidebar lets you upload a CSV or specify a path, choose a config file
+(`./config.yaml` by default) and toggle **Fast mode**. Buttons trigger training,
+prediction on the uploaded data and rendering of the Markdown report. The main
+area displays logs and artefacts from training, shows prediction results with a
+download option and renders the generated report.
+
